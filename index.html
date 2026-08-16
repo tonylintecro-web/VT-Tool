@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VT 退休資產成長預估工具</title>
+<!-- PWA / iOS 加入主畫面 支援 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VT估算">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f9f9f7">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:   #fcfcfb;
+    --page:        #f9f9f7;
+    --text-primary:#0b0b0b;
+    --text-secondary:#52514e;
+    --muted:       #898781;
+    --grid:        #e1e0d9;
+    --baseline:    #c3c2b7;
+    --border:      rgba(11,11,11,0.10);
+    --good:        #006300;
+    --card-shadow: 0 1px 2px rgba(11,11,11,0.06), 0 1px 1px rgba(11,11,11,0.04);
+    --series-1: #2a78d6; /* 保守 blue */
+    --series-2: #eb6834; /* 溫和 orange */
+    --series-3: #1baf7a; /* 基準 aqua */
+    --series-4: #eda100; /* 樂觀 yellow */
+    --accent:   #2a78d6;
+    --danger:   #d03b3b;
+    --hero-glow:     rgba(42,120,214,0.07);
+    --accent-wash:   rgba(42,120,214,0.08);
+    --card-hairline: rgba(255,255,255,0.6);
+    --card-shadow-hover: 0 10px 24px rgba(11,11,11,0.09), 0 2px 6px rgba(11,11,11,0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:#1a1a19;
+      --page:     #0d0d0d;
+      --text-primary:#ffffff;
+      --text-secondary:#c3c2b7;
+      --muted:    #898781;
+      --grid:     #2c2c2a;
+      --baseline: #383835;
+      --border:   rgba(255,255,255,0.10);
+      --good:     #0ca30c;
+      --card-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.3);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+      --accent:   #3987e5;
+      --danger:   #e66767;
+      --hero-glow:     rgba(57,135,229,0.14);
+      --accent-wash:   rgba(57,135,229,0.16);
+      --card-hairline: rgba(255,255,255,0.05);
+      --card-shadow-hover: 0 12px 28px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:#1a1a19;
+    --page:     #0d0d0d;
+    --text-primary:#ffffff;
+    --text-secondary:#c3c2b7;
+    --muted:    #898781;
+    --grid:     #2c2c2a;
+    --baseline: #383835;
+    --border:   rgba(255,255,255,0.10);
+    --good:     #0ca30c;
+    --card-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.3);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --accent:   #3987e5;
+    --danger:   #e66767;
+    --hero-glow:     rgba(57,135,229,0.14);
+    --accent-wash:   rgba(57,135,229,0.16);
+    --card-hairline: rgba(255,255,255,0.05);
+    --card-shadow-hover: 0 12px 28px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  body {
+    padding: 20px 16px 60px;
+    background:
+      radial-gradient(1100px 520px at 12% -8%, var(--hero-glow), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, var(--hero-glow), transparent 55%),
+      var(--page);
+  }
+  body::before {
+    content: '';
+    position: fixed; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, var(--series-1), var(--series-3) 50%, var(--series-4));
+    z-index: 50;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+  header.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; padding-top: 4px; }
+  header.top h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 4px; }
+  header.top p.sub { margin: 0; color: var(--text-secondary); font-size: 13px; }
+  .top-actions { display: flex; gap: 8px; align-items: center; }
+
+  button {
+    font-family: inherit; font-size: 13px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+    border-radius: 9px; padding: 7px 12px; transition: background .15s, transform .1s, box-shadow .15s;
+  }
+  button:hover { background: var(--grid); }
+  button:active { transform: scale(.96); }
+  button.primary, #refreshBtn {
+    background: linear-gradient(155deg, var(--accent), var(--series-3));
+    color: #fff; border-color: transparent;
+    box-shadow: 0 4px 14px var(--accent-wash);
+  }
+  button.primary:hover, #refreshBtn:hover { filter: brightness(1.08); }
+  button.icon { padding: 7px 9px; }
+  button.danger-text { color: var(--danger); background: transparent; border: none; padding: 4px 8px; }
+  button.danger-text:hover { background: var(--grid); border-radius: 6px; }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; box-shadow: var(--card-shadow), inset 0 1px 0 var(--card-hairline);
+    transition: box-shadow .2s ease, transform .2s ease;
+  }
+  .card:hover { box-shadow: var(--card-shadow-hover), inset 0 1px 0 var(--card-hairline); transform: translateY(-1px); }
+  .card h2 { font-size: 14.5px; font-weight: 700; margin: 0 0 14px; color: var(--text-primary); letter-spacing: .01em; }
+  .card h2 .hint { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; letter-spacing: normal; }
+
+  .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .stat { padding: 10px 4px; border-radius: 12px; transition: background .2s; }
+  .stat .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .stat .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat .meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .stat .meta.err { color: var(--danger); }
+  .stat input[type=number] {
+    font-size: 20px; font-weight: 600; width: 100%; border: 1px solid var(--border);
+    background: transparent; color: var(--text-primary); border-radius: 6px; padding: 4px 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat.hero {
+    background: linear-gradient(135deg, var(--accent-wash), transparent 70%);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+  }
+  .stat.hero .value { font-size: 30px; font-weight: 800; color: var(--accent); letter-spacing: -0.01em; }
+
+  .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 16px; }
+  .field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .field input, .field select {
+    width: 100%; font-size: 14px; padding: 6px 8px; border: 1px solid var(--border);
+    border-radius: 6px; background: var(--surface-1); color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+  .field .swatch { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:middle; }
+
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data-table th, table.data-table td {
+    padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--grid);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  table.data-table th { color: var(--text-secondary); font-weight: 600; font-size: 12px; background: var(--page); }
+  table.data-table td:first-child, table.data-table th:first-child { text-align: left; }
+  table.data-table tbody tr:hover { background: var(--page); }
+  table.data-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--page) 55%, transparent); }
+  .table-scroll { overflow-x: auto; }
+
+  .contrib-table input { width: 100%; border: 1px solid transparent; background: transparent; color: var(--text-primary); font-size: 13px; padding: 4px 6px; border-radius: 4px; font-variant-numeric: tabular-nums; }
+  .contrib-table input:hover, .contrib-table input:focus { border-color: var(--border); background: var(--page); }
+  .contrib-table td:first-child, .contrib-table td:nth-child(2) { text-align: center; }
+  .contrib-table input[type=text] { text-align: left; }
+  .contrib-table tr.past { opacity: 0.45; }
+  .contrib-table tr.past::after { content: ''; }
+  .contrib-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  .contrib-foot .total { font-size: 12px; color: var(--text-secondary); }
+
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 10px; font-size: 12px; color: var(--text-secondary); }
+  .chart-legend .item { display: flex; align-items: center; gap: 6px; }
+  .chart-legend .key { width: 16px; height: 2px; border-radius: 2px; }
+  .chart-legend .key.dashed { background-image: linear-gradient(to right, var(--muted) 60%, transparent 0%); background-size: 6px 2px; background-repeat: repeat-x; height: 2px; background-color: transparent; }
+  .chart-toggle { font-size: 12px; color: var(--text-secondary); display:flex; align-items:center; gap:6px; margin-bottom: 6px; }
+
+  .mode-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .mode-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .mode-switch .mode-btn {
+    border: none; border-radius: 0; background: var(--surface-1); color: var(--text-secondary);
+    font-size: 12px; padding: 6px 12px;
+  }
+  .mode-switch .mode-btn + .mode-btn { border-left: 1px solid var(--border); }
+  .mode-switch .mode-btn.active {
+    background: linear-gradient(135deg, var(--accent), var(--series-3));
+    color: #fff; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+  }
+  .mode-note { font-size: 12px; color: var(--muted); }
+
+  .chart-wrap { position: relative; }
+  svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+  .tooltip {
+    position: absolute; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: var(--card-shadow); opacity: 0; transition: opacity .1s;
+    min-width: 150px; z-index: 5;
+  }
+  .tooltip .t-year { font-weight: 600; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+  .tooltip .t-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 1px 0; }
+  .tooltip .t-row .k { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+  .tooltip .t-row .k .line { width: 12px; height: 2px; border-radius: 2px; }
+  .tooltip .t-row .v { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .disclaimer { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .disclaimer a { color: var(--muted); }
+  .footer-links { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; }
+
+  .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-secondary); }
+  .badge.ok { color: var(--good); }
+  .badge.warn { color: var(--danger); }
+
+  @media (max-width: 640px) {
+    header.top { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1>VT 退休資產成長預估工具</h1>
+      <p class="sub" id="asOfLine">資料基準日：載入中…</p>
+      <p class="sub" id="settingsMsg" style="display:none;"></p>
+    </div>
+    <div class="top-actions">
+      <button class="icon" id="themeToggle" title="切換深色/淺色模式">🌓</button>
+      <button id="exportSettingsBtn" title="將股數、投入排程、報酬率等設定匯出成檔案，可帶到新電腦匯入">⬇ 匯出設定</button>
+      <button id="importSettingsBtn" title="從備份檔案還原設定（例如換電腦後）">⬆ 匯入設定</button>
+      <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+      <button id="refreshBtn">🔄 重新整理即時數據</button>
+    </div>
+  </header>
+
+  <section class="card">
+    <h2>💰 目前資產狀態</h2>
+    <div class="status-grid">
+      <div class="stat">
+        <div class="label">VT 股價（美元）</div>
+        <input type="number" id="vtPriceInput" step="0.01">
+        <div class="meta" id="vtPriceMeta">—</div>
+      </div>
+      <div class="stat">
+        <div class="label">台幣匯率 USD/TWD</div>
+        <input type="number" id="fxRateInput" step="0.001">
+        <div class="meta" id="fxRateMeta">—</div>
+      </div>
+      <div class="stat">
+        <div class="label">VT 持有股數</div>
+        <input type="number" id="sharesInput" step="0.00001">
+        <div class="meta">您目前持有的 VT 股數，請自行維護</div>
+      </div>
+      <div class="stat hero">
+        <div class="label">目前市值（自動計算）</div>
+        <div class="value" id="currentValueOut">—</div>
+        <div class="meta" id="currentValueMeta">股數 × 股價 × 匯率</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>🎯 情境與預估參數</h2>
+    <div class="settings-grid">
+      <div class="field">
+        <label><span class="swatch" style="background:var(--series-1)"></span>保守情境年化報酬率 (%)</label>
+        <input type="number" id="rate0" step="0.1">
+      </div>
+      <div class="field">
+        <label><span class="swatch" style="background:var(--series-2)"></span>溫和情境年化報酬率 (%)</label>
+        <input type="number" id="rate1" step="0.1">
+      </div>
+      <div class="field">
+        <label><span class="swatch" style="background:var(--series-3)"></span>基準情境年化報酬率 (%)</label>
+        <input type="number" id="rate2" step="0.1">
+      </div>
+      <div class="field">
+        <label><span class="swatch" style="background:var(--series-4)"></span>樂觀情境年化報酬率 (%)</label>
+        <input type="number" id="rate3" step="0.1">
+      </div>
+      <div class="field">
+        <label>資產快照月份（例如退休月份）</label>
+        <select id="snapshotMonth">
+          <option value="1">1 月</option><option value="2">2 月</option><option value="3">3 月</option>
+          <option value="4">4 月</option><option value="5">5 月</option><option value="6">6 月</option>
+          <option value="7">7 月</option><option value="8">8 月</option><option value="9">9 月</option>
+          <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>預估至西元（年）</label>
+        <input type="number" id="horizonYear" step="1">
+      </div>
+      <div class="field">
+        <label>預估通膨率（年，%）</label>
+        <input type="number" id="inflationRate" step="0.1">
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>📅 投入排程 <span class="hint">未來已排定的定期定額 / 獎金 / 匯回款項，會自動計入預估；已過期的月份會變淡且不再影響預估</span></h2>
+    <div class="table-scroll">
+      <table class="data-table contrib-table" id="contribTable">
+        <thead>
+          <tr><th>年</th><th>月</th><th>金額（台幣）</th><th>說明</th><th></th></tr>
+        </thead>
+        <tbody id="contribBody"></tbody>
+      </table>
+    </div>
+    <div class="contrib-foot">
+      <button id="addRowBtn">＋ 新增一列</button>
+      <span class="total" id="contribTotal"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 id="chartTitle">📈 年度資產成長預估（單位：萬元台幣）</h2>
+    <div class="mode-row">
+      <div class="mode-switch" id="modeSwitch" role="group" aria-label="金額顯示方式">
+        <button type="button" class="mode-btn active" data-mode="nominal">名目金額</button>
+        <button type="button" class="mode-btn" data-mode="real">實質購買力（今天等值）</button>
+      </div>
+      <div class="mode-switch" id="currencySwitch" role="group" aria-label="幣別">
+        <button type="button" class="mode-btn active" data-cur="TWD">台幣</button>
+        <button type="button" class="mode-btn" data-cur="USD">美元</button>
+      </div>
+      <span class="mode-note" id="modeNote"></span>
+    </div>
+    <label class="chart-toggle"><input type="checkbox" id="showPrincipal" checked> 顯示「累積投入資產（不含成長，僅供對照）」參考線</label>
+    <div class="chart-legend" id="chartLegend"></div>
+    <div class="chart-wrap" id="chartWrap">
+      <svg class="chart" id="chartSvg" viewBox="0 0 960 420" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 id="tableTitle">📊 年度數據表</h2>
+    <div class="table-scroll">
+      <table class="data-table" id="yearTable"></table>
+    </div>
+    <div class="contrib-foot">
+      <button id="exportCsvBtn">⬇ 匯出 CSV（含名目與實質金額）</button>
+      <span class="total" id="tableMeta"></span>
+    </div>
+  </section>
+
+  <section class="disclaimer">
+    <p><strong>資料來源與方法：</strong>VT 股價取自 Yahoo Finance 即時報價（透過公開 CORS 代理讀取）；台幣匯率取自 exchangerate-api.com 公開匯率。每次開啟本頁面會自動嘗試更新這兩個數字；若網路無法連線，會沿用上次成功取得的數值，您也可以隨時手動輸入。所有輸入（股數、投入排程、報酬率假設、預估年期、通膨率）都會儲存在您這台電腦的瀏覽器（localStorage），不會上傳到任何伺服器。<strong>換電腦時</strong>請先按右上角「⬇ 匯出設定」存一個備份檔，帶到新電腦後用「⬆ 匯入設定」載入，即可還原所有設定；單純複製這個 HTML 檔案並不會帶走瀏覽器裡的設定。</p>
+    <p><strong>通膨調整方法：</strong>「實質購買力」= 名目金額 ÷ (1+通膨率)^經過年數，經過年數以「資料基準日（今天）」到「該年度快照月份」的實際年數計算。換算後的數字代表：這筆未來的錢，換算成今天幣值大約能買到多少東西 —— 讓您用「今天的購買力」直接比較，而不是被通膨放大的名目數字誤導。通膨率為您自行假設的單一年複合率，僅供參考。</p>
+    <p><strong>免責聲明：</strong>本工具僅為個人資產成長試算輔助，四種年化報酬率與通膨率均為使用者自行假設之情境，不構成投資建議，實際報酬與通膨可能因市場波動而與預估產生重大落差。</p>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var STORAGE_KEY = 'vt_retire_tool_state_v1';
+  var CACHE_KEY = 'vt_retire_tool_live_cache_v1';
+  var THEME_KEY = 'vt_retire_tool_theme';
+
+  var DEFAULT_CONTRIB = [
+    [2026,8,30000,'每月定期定額'],[2026,9,30000,'每月定期定額'],[2026,10,30000,'每月定期定額'],
+    [2026,11,30000,'每月定期定額'],[2026,12,30000,'每月定期定額'],
+    [2027,1,30000,'每月定期定額'],[2027,2,30000,'每月定期定額'],[2027,3,30000,'每月定期定額'],
+    [2027,4,30000,'每月定期定額'],[2027,5,30000,'每月定期定額'],[2027,6,30000,'每月定期定額'],
+    [2027,7,30000,'每月定期定額'],[2027,8,30000,'每月定期定額'],[2027,9,30000,'每月定期定額'],
+    [2027,10,30000,'每月定期定額'],[2027,11,30000,'每月定期定額'],[2027,12,30000,'每月定期定額'],
+    [2028,1,30000,'每月定期定額'],[2028,2,30000,'每月定期定額'],[2028,3,30000,'每月定期定額'],
+    [2028,4,30000,'每月定期定額'],[2028,5,30000,'每月定期定額'],[2028,6,30000,'每月定期定額'],
+    [2028,7,30000,'每月定期定額'],
+    [2027,1,500000,'年終獎金（加碼）'],[2028,1,500000,'年終獎金（加碼）'],
+    [2028,8,965340,'回台前單筆匯回（約3萬美元，以32.178試算）'],
+    [2029,1,240000,'年終獎金'],[2030,1,240000,'年終獎金'],[2031,1,240000,'年終獎金'],
+    [2032,1,240000,'年終獎金'],[2033,1,240000,'年終獎金'],[2034,1,240000,'年終獎金'],
+    [2035,1,240000,'年終獎金'],[2036,1,240000,'年終獎金']
+  ].map(function(r){ return {y:r[0], m:r[1], amt:r[2], note:r[3]}; });
+
+  var now = new Date();
+  var DEFAULTS = {
+    shares: 1353.93752,
+    vtPrice: 161.3,
+    fxRate: 32.288,
+    rates: [0.05, 0.06, 0.07, 0.08],
+    snapshotMonth: 7,
+    horizonYear: now.getFullYear() + 17,
+    inflationRate: 0.02,
+    displayMode: 'nominal',
+    currency: 'TWD',
+    contributions: DEFAULT_CONTRIB
+  };
+
+  var SERIES_META = [
+    {key:'r0', label:'保守', varname:'--series-1'},
+    {key:'r1', label:'溫和', varname:'--series-2'},
+    {key:'r2', label:'基準', varname:'--series-3'},
+    {key:'r3', label:'樂觀', varname:'--series-4'}
+  ];
+
+  function loadState() {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return JSON.parse(JSON.stringify(DEFAULTS));
+    try {
+      var s = JSON.parse(raw);
+      var merged = JSON.parse(JSON.stringify(DEFAULTS));
+      Object.keys(merged).forEach(function(k){ if (s[k] !== undefined) merged[k] = s[k]; });
+      return merged;
+    } catch(e) { return JSON.parse(JSON.stringify(DEFAULTS)); }
+  }
+
+  var state = loadState();
+
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function loadCache() {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch(e) { return {}; }
+  }
+  function saveCache(c) { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); }
+
+  // ---------- Theme ----------
+  var savedTheme = localStorage.getItem(THEME_KEY);
+  if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+  document.getElementById('themeToggle').addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme');
+    var next = cur === 'dark' ? 'light' : (cur === 'light' ? null : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'));
+    if (next) { document.documentElement.setAttribute('data-theme', next); localStorage.setItem(THEME_KEY, next); }
+    else { document.documentElement.removeAttribute('data-theme'); localStorage.removeItem(THEME_KEY); }
+    renderChart();
+  });
+
+  // ---------- Live data fetch ----------
+  function fetchFX() {
+    var urls = ['https://open.er-api.com/v6/latest/USD', 'https://api.exchangerate-api.com/v4/latest/USD'];
+    function tryUrl(i) {
+      if (i >= urls.length) return Promise.reject(new Error('FX 來源皆無法連線'));
+      return fetch(urls[i]).then(function(res){
+        if (!res.ok) throw new Error('status ' + res.status);
+        return res.json();
+      }).then(function(data){
+        var rate = data.rates && data.rates.TWD;
+        if (!rate) throw new Error('no TWD rate');
+        return { rate: rate, time: new Date().toISOString() };
+      }).catch(function(){ return tryUrl(i+1); });
+    }
+    return tryUrl(0);
+  }
+
+  function fetchVTPrice() {
+    var target = 'https://query1.finance.yahoo.com/v8/finance/chart/VT';
+    var proxy = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(target);
+    return fetch(proxy).then(function(res){
+      if (!res.ok) throw new Error('status ' + res.status);
+      return res.json();
+    }).then(function(data){
+      var meta = data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
+      if (!meta || !meta.regularMarketPrice) throw new Error('no price in response');
+      return { price: meta.regularMarketPrice, time: meta.regularMarketTime ? new Date(meta.regularMarketTime*1000).toISOString() : new Date().toISOString() };
+    });
+  }
+
+  function fmtTime(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString('zh-TW', {year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+  }
+
+  function refreshLiveData() {
+    var cache = loadCache();
+    document.getElementById('vtPriceMeta').textContent = '更新中…';
+    document.getElementById('fxRateMeta').textContent = '更新中…';
+    document.getElementById('vtPriceMeta').className = 'meta';
+    document.getElementById('fxRateMeta').className = 'meta';
+
+    fetchVTPrice().then(function(r){
+      state.vtPrice = r.price;
+      document.getElementById('vtPriceInput').value = round2(r.price);
+      cache.vtPrice = r.price; cache.vtPriceTime = r.time;
+      document.getElementById('vtPriceMeta').textContent = '自動更新於 ' + fmtTime(r.time);
+      saveCache(cache); saveState(); recomputeAndRender();
+    }).catch(function(err){
+      var msg = cache.vtPriceTime ? ('更新失敗，沿用 ' + fmtTime(cache.vtPriceTime) + ' 的數值，可手動輸入') : '更新失敗，請手動輸入股價';
+      document.getElementById('vtPriceMeta').textContent = msg;
+      document.getElementById('vtPriceMeta').className = 'meta err';
+    });
+
+    fetchFX().then(function(r){
+      state.fxRate = r.rate;
+      document.getElementById('fxRateInput').value = round3(r.rate);
+      cache.fxRate = r.rate; cache.fxRateTime = r.time;
+      document.getElementById('fxRateMeta').textContent = '自動更新於 ' + fmtTime(r.time);
+      saveCache(cache); saveState(); recomputeAndRender();
+    }).catch(function(err){
+      var msg = cache.fxRateTime ? ('更新失敗，沿用 ' + fmtTime(cache.fxRateTime) + ' 的數值，可手動輸入') : '更新失敗，請手動輸入匯率';
+      document.getElementById('fxRateMeta').textContent = msg;
+      document.getElementById('fxRateMeta').className = 'meta err';
+    });
+  }
+
+  function round2(n){ return Math.round(n*100)/100; }
+  function round3(n){ return Math.round(n*1000)/1000; }
+
+  // ---------- Compute engine ----------
+  function buildMonths(anchorY, anchorM, horizonY) {
+    var months = []; var y = anchorY, m = anchorM;
+    var guard = 0;
+    while ((y < horizonY || (y === horizonY && m <= 12)) && guard < 2400) {
+      months.push([y, m]);
+      m++; if (m > 12) { m = 1; y++; }
+      guard++;
+    }
+    return months;
+  }
+
+  function contributionFor(contribs, y, m) {
+    var sum = 0;
+    for (var i=0;i<contribs.length;i++) { var c = contribs[i]; if (c.y === y && c.m === m) sum += (Number(c.amt) || 0); }
+    return sum;
+  }
+
+  function computeProjection() {
+    var anchorY = now.getFullYear(), anchorM = now.getMonth() + 1;
+    var currentValue = (Number(state.shares)||0) * (Number(state.vtPrice)||0) * (Number(state.fxRate)||0);
+    var months = buildMonths(anchorY, anchorM, Number(state.horizonYear));
+    var assets = state.rates.map(function(){ return currentValue; });
+    var principal = currentValue;
+    var infl = Number(state.inflationRate) || 0;
+    var rows = [];
+    months.forEach(function(pair, idx){
+      var y = pair[0], m = pair[1];
+      if (idx > 0) {
+        var contrib = contributionFor(state.contributions, y, m);
+        assets = assets.map(function(a, i){ return a * (1 + state.rates[i]/12) + contrib; });
+        principal += contrib;
+      }
+      if (m === Number(state.snapshotMonth)) {
+        var yearsElapsed = (y - anchorY) + (m - anchorM) / 12;
+        var deflator = Math.pow(1 + infl, yearsElapsed);
+        rows.push({
+          year: y,
+          values: assets.slice(),
+          principal: principal,
+          yearsElapsed: yearsElapsed,
+          realValues: assets.map(function(a){ return a / deflator; }),
+          realPrincipal: principal / deflator
+        });
+      }
+    });
+    return { currentValue: currentValue, anchorY: anchorY, anchorM: anchorM, rows: rows };
+  }
+
+  // ---------- Rendering: status ----------
+  function renderStatus(proj) {
+    document.getElementById('asOfLine').textContent = '資料基準日：' + proj.anchorY + ' 年 ' + proj.anchorM + ' 月（今天）';
+    var cur = currencyCfg();
+    var curVal = cur.code === 'USD' ? proj.currentValue / cur.fx : proj.currentValue;
+    document.getElementById('currentValueOut').textContent = cur.symbol + ' ' + Math.round(curVal).toLocaleString('zh-TW');
+    document.getElementById('currentValueMeta').textContent = cur.code === 'USD'
+      ? (Number(state.shares)||0).toLocaleString('zh-TW') + ' 股 × US$' + (Number(state.vtPrice)||0) + '（以目前匯率 ' + (Number(state.fxRate)||0) + ' 換算）'
+      : (Number(state.shares)||0).toLocaleString('zh-TW') + ' 股 × US$' + (Number(state.vtPrice)||0) + ' × ' + (Number(state.fxRate)||0);
+  }
+
+  // ---------- Rendering: contribution table ----------
+  function isPast(c, anchorY, anchorM) {
+    return (c.y < anchorY) || (c.y === anchorY && c.m < anchorM);
+  }
+
+  function renderContribTable() {
+    var body = document.getElementById('contribBody');
+    body.innerHTML = '';
+    var anchorY = now.getFullYear(), anchorM = now.getMonth() + 1;
+    var total = 0;
+    state.contributions.forEach(function(c, idx){
+      var tr = document.createElement('tr');
+      if (isPast(c, anchorY, anchorM)) tr.className = 'past'; else total += (Number(c.amt)||0);
+      tr.innerHTML =
+        '<td><input type="number" data-f="y" min="2000" max="2100" value="' + c.y + '"></td>' +
+        '<td><input type="number" data-f="m" min="1" max="12" value="' + c.m + '"></td>' +
+        '<td><input type="number" data-f="amt" step="1000" value="' + c.amt + '"></td>' +
+        '<td><input type="text" data-f="note" value="' + escapeAttr(c.note) + '"></td>' +
+        '<td><button class="danger-text" data-del="1">刪除</button></td>';
+      tr.querySelectorAll('input').forEach(function(inp){
+        inp.addEventListener('change', function(){
+          var f = inp.getAttribute('data-f');
+          state.contributions[idx][f] = (f === 'note') ? inp.value : Number(inp.value);
+          saveState(); recomputeAndRender();
+        });
+      });
+      tr.querySelector('[data-del]').addEventListener('click', function(){
+        state.contributions.splice(idx, 1); saveState(); recomputeAndRender();
+      });
+      body.appendChild(tr);
+    });
+    document.getElementById('contribTotal').textContent = '未來已排定投入總額：NT$ ' + Math.round(total).toLocaleString('zh-TW');
+  }
+
+  function escapeAttr(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  document.getElementById('addRowBtn').addEventListener('click', function(){
+    var y = now.getFullYear(), m = now.getMonth()+1;
+    if (state.contributions.length) {
+      var last = state.contributions[state.contributions.length-1];
+      y = last.y; m = last.m + 1; if (m > 12) { m = 1; y++; }
+    }
+    state.contributions.push({y:y, m:m, amt:0, note:''});
+    saveState(); recomputeAndRender();
+  });
+
+  // ---------- Rendering: year table ----------
+  function isReal() { return state.displayMode === 'real'; }
+
+  // Display-layer currency conversion. Model stays in TWD; USD = TWD / current fx.
+  function currencyCfg() {
+    var fx = Number(state.fxRate) || 0;
+    if (state.currency === 'USD' && fx > 0) {
+      return { code: 'USD', unitLabel: '萬美元', symbol: 'US$', fx: fx,
+        conv: function(v){ return v / fx; } };
+    }
+    return { code: 'TWD', unitLabel: '萬元台幣', symbol: 'NT$', fx: (fx || 1),
+      conv: function(v){ return v; } };
+  }
+
+  function renderYearTable(proj) {
+    var table = document.getElementById('yearTable');
+    var real = isReal();
+    var cur = currencyCfg();
+    var head = '<thead><tr><th>年份（' + state.snapshotMonth + '月）</th>' +
+      SERIES_META.map(function(s,i){ return '<th>' + s.label + Math.round(state.rates[i]*1000)/10 + '%</th>'; }).join('') +
+      '<th>累積投入資產</th></tr></thead>';
+    var rows = proj.rows.map(function(r){
+      var vals = real ? r.realValues : r.values;
+      var princ = real ? r.realPrincipal : r.principal;
+      return '<tr><td>' + r.year + '</td>' +
+        vals.map(function(v){ return '<td>' + cur.conv(v/10000).toLocaleString('zh-TW',{maximumFractionDigits:0}) + '</td>'; }).join('') +
+        '<td>' + cur.conv(princ/10000).toLocaleString('zh-TW',{maximumFractionDigits:0}) + '</td></tr>';
+    }).join('');
+    table.innerHTML = head + '<tbody>' + rows + '</tbody>';
+    document.getElementById('tableMeta').textContent = '單位：' + cur.unitLabel + '（' + (real ? '實質購買力' : '名目金額') + '），共 ' + proj.rows.length + ' 個年度快照';
+    document.getElementById('tableTitle').textContent = real ? '📊 年度數據表（今天的購買力）' : '📊 年度數據表';
+  }
+
+  document.getElementById('exportCsvBtn').addEventListener('click', function(){
+    var proj = computeProjection();
+    var cur = currencyCfg();
+    var u = '(' + cur.unitLabel + ')';
+    var header = ['年份'];
+    SERIES_META.forEach(function(s,i){ header.push(s.label + (state.rates[i]*100) + '%_名目' + u); });
+    header.push('累積投入資產_名目' + u);
+    SERIES_META.forEach(function(s,i){ header.push(s.label + (state.rates[i]*100) + '%_實質' + u); });
+    header.push('累積投入資產_實質' + u);
+    var lines = [header.join(',')];
+    proj.rows.forEach(function(r){
+      var row = [r.year]
+        .concat(r.values.map(function(v){ return Math.round(cur.conv(v/10000)); }))
+        .concat([Math.round(cur.conv(r.principal/10000))])
+        .concat(r.realValues.map(function(v){ return Math.round(cur.conv(v/10000)); }))
+        .concat([Math.round(cur.conv(r.realPrincipal/10000))]);
+      lines.push(row.join(','));
+    });
+    lines.push('');
+    lines.push('幣別,' + cur.code + (cur.code === 'USD' ? '（以目前匯率 ' + cur.fx + ' 換算）' : ''));
+    lines.push('通膨假設(年,%),' + (state.inflationRate*100));
+    var blob = new Blob(['﻿' + lines.join('\n')], {type: 'text/csv;charset=utf-8;'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'VT退休資產成長預估_' + now.getFullYear() + '-' + (now.getMonth()+1) + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+
+  // ---------- Rendering: chart ----------
+  function niceNumber(range, round) {
+    if (range === 0) return 1;
+    var exponent = Math.floor(Math.log10(range));
+    var fraction = range / Math.pow(10, exponent);
+    var niceFraction;
+    if (round) {
+      if (fraction < 1.5) niceFraction = 1; else if (fraction < 3) niceFraction = 2;
+      else if (fraction < 7) niceFraction = 5; else niceFraction = 10;
+    } else {
+      if (fraction <= 1) niceFraction = 1; else if (fraction <= 2) niceFraction = 2;
+      else if (fraction <= 5) niceFraction = 5; else niceFraction = 10;
+    }
+    return niceFraction * Math.pow(10, exponent);
+  }
+  function niceScale(min, max, maxTicks) {
+    maxTicks = maxTicks || 5;
+    if (max <= min) max = min + 1;
+    var range = niceNumber(max - min, false);
+    var step = niceNumber(range / (maxTicks - 1), true);
+    var niceMin = Math.floor(min / step) * step;
+    var niceMax = Math.ceil(max / step) * step;
+    var ticks = [];
+    for (var v = niceMin; v <= niceMax + 1e-9; v += step) ticks.push(Math.round(v * 1000) / 1000);
+    return { min: niceMin, max: niceMax, ticks: ticks };
+  }
+
+  var lastProj = null;
+
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function renderChart() {
+    var proj = lastProj; if (!proj) return;
+    var svg = document.getElementById('chartSvg');
+    var rows = proj.rows;
+    var showPrincipal = document.getElementById('showPrincipal').checked;
+    var W = 960, H = 420, padL = 62, padR = 20, padT = 20, padB = 44;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    var ns = 'http://www.w3.org/2000/svg';
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    if (!rows.length) {
+      var txt = document.createElementNS(ns, 'text');
+      txt.setAttribute('x', W/2); txt.setAttribute('y', H/2); txt.setAttribute('text-anchor','middle');
+      txt.setAttribute('fill', cssVar('--muted')); txt.textContent = '目前設定下沒有可顯示的年度快照（請確認預估年期與快照月份）';
+      svg.appendChild(txt); document.getElementById('chartLegend').innerHTML=''; return;
+    }
+
+    var real = isReal();
+    var cur = currencyCfg();
+    var seriesData = SERIES_META.map(function(s, i){ return rows.map(function(r){ return cur.conv((real ? r.realValues[i] : r.values[i])/10000); }); });
+    var principalData = rows.map(function(r){ return cur.conv((real ? r.realPrincipal : r.principal)/10000); });
+    var allVals = seriesData.reduce(function(a,b){ return a.concat(b); }, []);
+    if (showPrincipal) allVals = allVals.concat(principalData);
+    var minV = 0, maxV = Math.max.apply(null, allVals);
+    var scale = niceScale(minV, maxV, 6);
+
+    function x(i) { return padL + (rows.length === 1 ? plotW/2 : i * (plotW / (rows.length - 1))); }
+    function y(v) { return padT + plotH - ((v - scale.min) / (scale.max - scale.min)) * plotH; }
+
+    // gridlines + y labels
+    scale.ticks.forEach(function(t){
+      var ly = y(t);
+      var line = document.createElementNS(ns,'line');
+      line.setAttribute('x1', padL); line.setAttribute('x2', padL+plotW);
+      line.setAttribute('y1', ly); line.setAttribute('y2', ly);
+      line.setAttribute('stroke', cssVar('--grid')); line.setAttribute('stroke-width', '1');
+      svg.appendChild(line);
+      var label = document.createElementNS(ns,'text');
+      label.setAttribute('x', padL - 8); label.setAttribute('y', ly + 4);
+      label.setAttribute('text-anchor','end'); label.setAttribute('font-size','11');
+      label.setAttribute('fill', cssVar('--muted'));
+      label.textContent = t.toLocaleString('zh-TW');
+      svg.appendChild(label);
+    });
+
+    // baseline axis
+    var axis = document.createElementNS(ns,'line');
+    axis.setAttribute('x1', padL); axis.setAttribute('x2', padL+plotW);
+    axis.setAttribute('y1', padT+plotH); axis.setAttribute('y2', padT+plotH);
+    axis.setAttribute('stroke', cssVar('--baseline')); axis.setAttribute('stroke-width','1');
+    svg.appendChild(axis);
+
+    // x labels (thin out if crowded)
+    var everyN = Math.ceil(rows.length / 12);
+    rows.forEach(function(r, i){
+      if (i % everyN !== 0 && i !== rows.length-1) return;
+      var label = document.createElementNS(ns,'text');
+      label.setAttribute('x', x(i)); label.setAttribute('y', padT+plotH+18);
+      label.setAttribute('text-anchor','middle'); label.setAttribute('font-size','11');
+      label.setAttribute('fill', cssVar('--muted'));
+      label.textContent = r.year;
+      svg.appendChild(label);
+    });
+
+    function pathFor(vals) {
+      return vals.map(function(v,i){ return (i===0?'M':'L') + x(i).toFixed(2) + ',' + y(v).toFixed(2); }).join(' ');
+    }
+
+    if (showPrincipal) {
+      var pPath = document.createElementNS(ns,'path');
+      pPath.setAttribute('d', pathFor(principalData));
+      pPath.setAttribute('fill','none'); pPath.setAttribute('stroke', cssVar('--muted'));
+      pPath.setAttribute('stroke-width','2'); pPath.setAttribute('stroke-dasharray','5,4');
+      pPath.setAttribute('stroke-linecap','round'); pPath.setAttribute('stroke-linejoin','round');
+      svg.appendChild(pPath);
+    }
+
+    seriesData.forEach(function(vals, si){
+      var color = cssVar(SERIES_META[si].varname);
+      var path = document.createElementNS(ns,'path');
+      path.setAttribute('d', pathFor(vals));
+      path.setAttribute('fill','none'); path.setAttribute('stroke', color);
+      path.setAttribute('stroke-width','2'); path.setAttribute('stroke-linecap','round'); path.setAttribute('stroke-linejoin','round');
+      svg.appendChild(path);
+
+      // end marker with surface ring
+      var lastI = vals.length - 1;
+      var ring = document.createElementNS(ns,'circle');
+      ring.setAttribute('cx', x(lastI)); ring.setAttribute('cy', y(vals[lastI])); ring.setAttribute('r','6');
+      ring.setAttribute('fill', cssVar('--surface-1'));
+      svg.appendChild(ring);
+      var dot = document.createElementNS(ns,'circle');
+      dot.setAttribute('cx', x(lastI)); dot.setAttribute('cy', y(vals[lastI])); dot.setAttribute('r','4');
+      dot.setAttribute('fill', color);
+      svg.appendChild(dot);
+
+      // end label
+      var endLabel = document.createElementNS(ns,'text');
+      endLabel.setAttribute('x', x(lastI) + 8); endLabel.setAttribute('y', y(vals[lastI]) + 4);
+      endLabel.setAttribute('font-size','11'); endLabel.setAttribute('fill', cssVar('--text-secondary'));
+      endLabel.setAttribute('font-weight','600');
+      endLabel.textContent = Math.round(vals[lastI]).toLocaleString('zh-TW');
+      svg.appendChild(endLabel);
+    });
+
+    // hover overlay
+    var overlay = document.createElementNS(ns,'rect');
+    overlay.setAttribute('x', padL); overlay.setAttribute('y', padT);
+    overlay.setAttribute('width', plotW); overlay.setAttribute('height', plotH);
+    overlay.setAttribute('fill', 'transparent'); overlay.style.cursor = 'crosshair';
+    svg.appendChild(overlay);
+
+    var crosshair = document.createElementNS(ns,'line');
+    crosshair.setAttribute('y1', padT); crosshair.setAttribute('y2', padT+plotH);
+    crosshair.setAttribute('stroke', cssVar('--baseline')); crosshair.setAttribute('stroke-width','1');
+    crosshair.style.opacity = '0';
+    svg.appendChild(crosshair);
+
+    var hoverDots = seriesData.map(function(_, si){
+      var c = document.createElementNS(ns,'circle');
+      c.setAttribute('r','5'); c.setAttribute('fill', cssVar(SERIES_META[si].varname));
+      c.setAttribute('stroke', cssVar('--surface-1')); c.setAttribute('stroke-width','2');
+      c.style.opacity = '0'; svg.appendChild(c); return c;
+    });
+
+    var tooltip = document.getElementById('tooltip');
+    var wrapEl = document.getElementById('chartWrap');
+
+    function showAt(i) {
+      crosshair.setAttribute('x1', x(i)); crosshair.setAttribute('x2', x(i)); crosshair.style.opacity = '1';
+      var rowsHtml = '<div class="t-year">' + rows[i].year + ' 年</div>';
+      seriesData.forEach(function(vals, si){
+        hoverDots[si].setAttribute('cx', x(i)); hoverDots[si].setAttribute('cy', y(vals[i])); hoverDots[si].style.opacity = '1';
+        rowsHtml += '<div class="t-row"><span class="k"><span class="line" style="background:' + cssVar(SERIES_META[si].varname) + '"></span>' + SERIES_META[si].label + '</span><span class="v">' + Math.round(vals[i]).toLocaleString('zh-TW') + '</span></div>';
+      });
+      if (showPrincipal) {
+        rowsHtml += '<div class="t-row"><span class="k"><span class="line" style="background:' + cssVar('--muted') + '"></span>累積投入資產</span><span class="v">' + Math.round(principalData[i]).toLocaleString('zh-TW') + '</span></div>';
+      }
+      tooltip.innerHTML = rowsHtml;
+      tooltip.style.opacity = '1';
+      var svgRect = svg.getBoundingClientRect();
+      var wrapRect = wrapEl.getBoundingClientRect();
+      var scaleX = svgRect.width / W;
+      var px = (x(i) * scaleX) + (svgRect.left - wrapRect.left);
+      var py = (svgRect.top - wrapRect.top) + 10;
+      var ttWidth = 170;
+      if (px + ttWidth > wrapRect.width) px = px - ttWidth - 16;
+      tooltip.style.left = Math.max(4, px + 12) + 'px';
+      tooltip.style.top = py + 'px';
+    }
+    function hideTip() {
+      crosshair.style.opacity = '0'; tooltip.style.opacity = '0';
+      hoverDots.forEach(function(d){ d.style.opacity = '0'; });
+    }
+    overlay.addEventListener('pointermove', function(e){
+      var svgRect = svg.getBoundingClientRect();
+      var relX = (e.clientX - svgRect.left) / svgRect.width * W;
+      var idx = rows.length === 1 ? 0 : Math.round((relX - padL) / (plotW / (rows.length - 1)));
+      idx = Math.max(0, Math.min(rows.length - 1, idx));
+      showAt(idx);
+    });
+    overlay.addEventListener('pointerleave', hideTip);
+
+    // legend
+    var legend = document.getElementById('chartLegend');
+    legend.innerHTML = SERIES_META.map(function(s,i){
+      return '<span class="item"><span class="key" style="background:' + cssVar(s.varname) + '"></span>' + s.label + Math.round(state.rates[i]*1000)/10 + '%</span>';
+    }).join('') + (showPrincipal ? '<span class="item"><span class="key dashed"></span>累積投入資產（不含成長）</span>' : '');
+
+    document.getElementById('chartTitle').textContent = real
+      ? '📈 年度資產成長預估（單位：' + cur.unitLabel + '，實質購買力，換算為今天等值）'
+      : '📈 年度資產成長預估（單位：' + cur.unitLabel + '，名目金額）';
+    var note = real
+      ? '已依假設通膨率 ' + (Math.round(state.inflationRate*1000)/10) + '%／年，換算成今天的購買力'
+      : '尚未扣除通膨，為未來各年度的名目金額';
+    if (cur.code === 'USD') note += '；美元以目前匯率 ' + cur.fx + ' 換算（各年度皆用同一匯率，未預測匯率走勢）';
+    document.getElementById('modeNote').textContent = note;
+  }
+
+  document.getElementById('showPrincipal').addEventListener('change', renderChart);
+  window.addEventListener('resize', renderChart);
+
+  document.querySelectorAll('#modeSwitch .mode-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      state.displayMode = btn.getAttribute('data-mode');
+      document.querySelectorAll('#modeSwitch .mode-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      saveState(); renderYearTable(lastProj); renderChart();
+    });
+  });
+
+  document.querySelectorAll('#currencySwitch .mode-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      state.currency = btn.getAttribute('data-cur');
+      document.querySelectorAll('#currencySwitch .mode-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      saveState(); renderStatus(lastProj); renderYearTable(lastProj); renderChart();
+    });
+  });
+
+  // ---------- Wire settings inputs ----------
+  function bindNumber(id, getFn, setFn) {
+    var el = document.getElementById(id);
+    el.value = getFn();
+    el.addEventListener('change', function(){
+      var v = Number(el.value);
+      if (!isNaN(v)) { setFn(v); saveState(); recomputeAndRender(); }
+    });
+  }
+
+  function initInputs() {
+    document.getElementById('sharesInput').value = state.shares;
+    document.getElementById('sharesInput').addEventListener('change', function(e){
+      state.shares = Number(e.target.value) || 0; saveState(); recomputeAndRender();
+    });
+    document.getElementById('vtPriceInput').value = state.vtPrice;
+    document.getElementById('vtPriceInput').addEventListener('change', function(e){
+      state.vtPrice = Number(e.target.value) || 0; saveState(); recomputeAndRender();
+      document.getElementById('vtPriceMeta').textContent = '手動輸入'; document.getElementById('vtPriceMeta').className='meta';
+    });
+    document.getElementById('fxRateInput').value = state.fxRate;
+    document.getElementById('fxRateInput').addEventListener('change', function(e){
+      state.fxRate = Number(e.target.value) || 0; saveState(); recomputeAndRender();
+      document.getElementById('fxRateMeta').textContent = '手動輸入'; document.getElementById('fxRateMeta').className='meta';
+    });
+
+    [0,1,2,3].forEach(function(i){
+      var el = document.getElementById('rate' + i);
+      el.value = Math.round(state.rates[i]*1000)/10;
+      el.addEventListener('change', function(){
+        var v = Number(el.value); if (!isNaN(v)) { state.rates[i] = v/100; saveState(); recomputeAndRender(); }
+      });
+    });
+
+    var sm = document.getElementById('snapshotMonth');
+    sm.value = state.snapshotMonth;
+    sm.addEventListener('change', function(){ state.snapshotMonth = Number(sm.value); saveState(); recomputeAndRender(); });
+
+    var hy = document.getElementById('horizonYear');
+    hy.value = state.horizonYear;
+    hy.addEventListener('change', function(){ state.horizonYear = Number(hy.value); saveState(); recomputeAndRender(); });
+
+    var ir = document.getElementById('inflationRate');
+    ir.value = Math.round(state.inflationRate*1000)/10;
+    ir.addEventListener('change', function(){
+      var v = Number(ir.value); if (!isNaN(v)) { state.inflationRate = v/100; saveState(); recomputeAndRender(); }
+    });
+
+    document.querySelectorAll('#modeSwitch .mode-btn').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-mode') === state.displayMode);
+    });
+    document.querySelectorAll('#currencySwitch .mode-btn').forEach(function(b){
+      b.classList.toggle('active', b.getAttribute('data-cur') === state.currency);
+    });
+  }
+
+  document.getElementById('refreshBtn').addEventListener('click', refreshLiveData);
+
+  // ---------- Export / import settings (for moving to a new computer) ----------
+  function pad2(n){ return String(n).length < 2 ? '0' + n : String(n); }
+
+  function showSettingsMsg(msg, isErr) {
+    var el = document.getElementById('settingsMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.color = isErr ? 'var(--danger)' : 'var(--good)';
+    clearTimeout(showSettingsMsg._t);
+    showSettingsMsg._t = setTimeout(function(){ el.style.display = 'none'; }, 6000);
+  }
+
+  document.getElementById('exportSettingsBtn').addEventListener('click', function(){
+    var payload = JSON.stringify(state, null, 2);
+    var blob = new Blob([payload], {type: 'application/json;charset=utf-8;'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    var d = new Date();
+    a.download = 'VT退休資產成長預估_設定備份_' + d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    showSettingsMsg('已匯出設定檔，換電腦後用「匯入設定」載入這個檔案即可。');
+  });
+
+  document.getElementById('importSettingsBtn').addEventListener('click', function(){
+    document.getElementById('importFile').click();
+  });
+
+  document.getElementById('importFile').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try {
+        var imported = JSON.parse(reader.result);
+        var merged = JSON.parse(JSON.stringify(DEFAULTS));
+        Object.keys(merged).forEach(function(k){ if (imported[k] !== undefined) merged[k] = imported[k]; });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        showSettingsMsg('設定已匯入，頁面即將重新整理套用新設定…');
+        setTimeout(function(){ window.location.reload(); }, 800);
+      } catch(err) {
+        showSettingsMsg('匯入失敗：檔案格式不正確，請確認是本工具「匯出設定」產生的檔案。', true);
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+  });
+
+  function recomputeAndRender() {
+    var proj = computeProjection();
+    lastProj = proj;
+    renderStatus(proj);
+    renderYearTable(proj);
+    renderChart();
+  }
+
+  // ---------- Init ----------
+  initInputs();
+  renderContribTable();
+  recomputeAndRender();
+
+  // apply cached live values immediately (before network), then try to refresh
+  (function applyCacheThenFetch(){
+    var cache = loadCache();
+    if (cache.vtPrice) {
+      document.getElementById('vtPriceMeta').textContent = '上次更新於 ' + fmtTime(cache.vtPriceTime) + '（正在重新整理…）';
+    }
+    if (cache.fxRate) {
+      document.getElementById('fxRateMeta').textContent = '上次更新於 ' + fmtTime(cache.fxRateTime) + '（正在重新整理…）';
+    }
+    refreshLiveData();
+  })();
+
+})();
+</script>
+</body>
+</html>
