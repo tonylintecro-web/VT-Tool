@@ -225,6 +225,21 @@
   .badge.ok { color: var(--good); }
   .badge.warn { color: var(--danger); }
 
+  .mc-year-block { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .mc-year-block:first-child { margin-top: 16px; }
+  .mc-year-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+  .mc-year-head .yr { font-size: 15px; font-weight: 700; }
+  .mc-year-head .prob { font-size: 22px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .mc-year-head .prob-label { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .mc-stats-row { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--text-secondary); margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .mc-stats-row b { color: var(--text-primary); font-weight: 600; }
+  .mc-legend { font-size: 11px; color: var(--muted); margin-top: 16px; line-height: 1.7; }
+  .mc-test-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+  .mc-test-table th, .mc-test-table td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  .mc-test-table th:first-child, .mc-test-table td:first-child { text-align: left; color: var(--text-secondary); }
+  .mc-test-table th { color: var(--muted); font-weight: 500; font-size: 11px; }
+  .mc-note { font-size: 12px; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+
   @media (max-width: 640px) {
     header.top { flex-direction: column; }
   }
@@ -327,6 +342,20 @@
       <button id="addRowBtn">＋ 新增一列</button>
       <span class="total" id="contribTotal"></span>
     </div>
+
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+      <div style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">批次新增連續月份（例如一段新的定期定額計畫，不用一列一列手動加）</div>
+      <div class="settings-grid">
+        <div class="field"><label>起始年月</label><input type="month" id="batchStart"></div>
+        <div class="field"><label>結束年月（含）</label><input type="month" id="batchEnd"></div>
+        <div class="field"><label>每月金額（台幣）</label><input type="number" id="batchAmt" step="1000"></div>
+        <div class="field"><label>說明</label><input type="text" id="batchNote" placeholder="例如：寬限期結餘 DCA"></div>
+      </div>
+      <div class="contrib-foot" style="margin-top:8px;">
+        <button id="batchAddBtn">批次新增這些月份</button>
+        <span class="total" id="batchMsg"></span>
+      </div>
+    </div>
   </section>
 
   <section class="card">
@@ -361,10 +390,102 @@
     </div>
   </section>
 
+  <section class="card">
+    <h2>🎲 蒙地卡羅資產機率模擬</h2>
+    <p class="hint" style="display:block; margin:-8px 0 14px; color:var(--muted); font-size:12px; line-height:1.6;">
+      用大量隨機路徑模擬報酬率的年度波動（而不是只看單一固定成長率），估算 2036 年與 2043 年資產落在各種區間的機率分佈。這個模組使用獨立的假設與投入排程，跟上方「情境與預估參數」「投入排程」是分開的兩套設定。
+    </p>
+
+    <div class="settings-grid">
+      <div class="field">
+        <label>目前 VT 市值（元台幣）</label>
+        <div style="display:flex; gap:6px;">
+          <input type="number" id="mcCurrentValue" step="10000" style="flex:1;">
+          <button type="button" id="mcSyncValueBtn" class="icon" title="同時帶入最上方「目前資產狀態」算出的市值，並把「目前日期」設為今天">📋</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>目前日期</label>
+        <input type="month" id="mcAnchorDate" min="2020-01" max="2043-12">
+      </div>
+      <div class="field">
+        <label>假設年化報酬率 CAGR（%）</label>
+        <input type="number" id="mcCagr" step="0.1">
+      </div>
+      <div class="field">
+        <label>假設年化波動度（%）</label>
+        <input type="number" id="mcSigma" step="0.1">
+      </div>
+      <div class="field">
+        <label>模擬路徑數</label>
+        <input type="number" id="mcPaths" step="1000" min="1000" max="200000">
+      </div>
+      <div class="field">
+        <label>2036 年門檻（萬元台幣）</label>
+        <input type="number" id="mcThreshold36" step="10">
+      </div>
+      <div class="field">
+        <label>2043 年門檻（萬元台幣）</label>
+        <input type="number" id="mcThreshold43" step="10">
+      </div>
+    </div>
+
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+      <div class="label" style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">投入排程（本模組固定假設的三段交錯金流，日曆時間點不會變動，只有金額/期數可調）</div>
+      <div class="settings-grid">
+        <div class="field">
+          <label>① 短期補給 DCA 每月金額（元）</label>
+          <input type="number" id="mcSeg1Amount" step="1">
+        </div>
+        <div class="field">
+          <label>① 期數（固定自 2026/06 起算）</label>
+          <input type="number" id="mcSeg1Count" step="1">
+        </div>
+        <div class="field">
+          <label>② 寬限期結餘 DCA 每月金額（元）</label>
+          <input type="number" id="mcSeg2Amount" step="1">
+        </div>
+        <div class="field">
+          <label>② 期數（固定自 2028/08 起算）</label>
+          <input type="number" id="mcSeg2Count" step="1">
+        </div>
+        <div class="field">
+          <label>③ 年終獎金加碼（2027、2028 各一次）</label>
+          <input type="number" id="mcBonusEarlyAmount" step="1">
+        </div>
+        <div class="field">
+          <label>③ 年終獎金（2029–2036 每年 1 月各一次）</label>
+          <input type="number" id="mcBonusLateAmount" step="1">
+        </div>
+        <div class="field">
+          <label>④ 回台前單筆匯回（固定 2028 年 8 月一次）</label>
+          <input type="number" id="mcLumpSumAmount" step="1">
+        </div>
+      </div>
+    </div>
+
+    <div class="contrib-foot" style="margin-top:16px;">
+      <button id="mcRunBtn" class="primary">▶ 執行模擬</button>
+      <button id="mcTestBtn">🧪 執行內建驗證情境（2028→2036/2043）</button>
+      <button id="mcSegCheckBtn">🧪 三段式銜接驗證（2026→2028）</button>
+      <span class="total" id="mcRunMeta"></span>
+    </div>
+
+    <div id="mcResults"></div>
+    <div id="mcTestResults"></div>
+    <div id="mcSegCheckResults"></div>
+
+    <details id="mcSelfCheckDetails" style="margin-top:16px;">
+      <summary style="cursor:pointer; font-size:12px; color:var(--text-secondary);">🔍 邏輯自我檢查：波動度 0% 是否等於純複利公式？</summary>
+      <div id="mcSelfCheck" style="margin-top:10px; font-size:13px; color:var(--text-secondary);"></div>
+    </details>
+  </section>
+
   <section class="disclaimer">
     <p><strong>資料來源與方法：</strong>VT 股價取自 Yahoo Finance 即時報價（透過公開 CORS 代理讀取）；台幣匯率取自 exchangerate-api.com 公開匯率。每次開啟本頁面會自動嘗試更新這兩個數字；若網路無法連線，會沿用上次成功取得的數值，您也可以隨時手動輸入。所有輸入（股數、投入排程、報酬率假設、預估年期、通膨率）都會儲存在您這台電腦的瀏覽器（localStorage），不會上傳到任何伺服器。<strong>換電腦時</strong>請先按右上角「⬇ 匯出設定」存一個備份檔，帶到新電腦後用「⬆ 匯入設定」載入，即可還原所有設定；單純複製這個 HTML 檔案並不會帶走瀏覽器裡的設定。</p>
     <p><strong>通膨調整方法：</strong>「實質購買力」= 名目金額 ÷ (1+通膨率)^經過年數，經過年數以「資料基準日（今天）」到「該年度快照月份」的實際年數計算。換算後的數字代表：這筆未來的錢，換算成今天幣值大約能買到多少東西 —— 讓您用「今天的購買力」直接比較，而不是被通膨放大的名目數字誤導。通膨率為您自行假設的單一年複合率，僅供參考。</p>
-    <p><strong>免責聲明：</strong>本工具僅為個人資產成長試算輔助，四種年化報酬率與通膨率均為使用者自行假設之情境，不構成投資建議，實際報酬與通膨可能因市場波動而與預估產生重大落差。</p>
+    <p><strong>蒙地卡羅模擬方法：</strong>用連續複利校準，讓模擬路徑的幾何平均剛好等於您輸入的年化報酬率（CAGR）：月對數報酬均值 = ln(1+CAGR)/12，月對數報酬標準差 = 年化波動度/√12，每月資產以對數常態方式滾動（乘上 e 的隨機指數），而不是把年化報酬率簡單除以 12 當作每月固定報酬（那樣會低估波動耗損、讓中位數系統性偏高）。「目前日期」之前的投入排程視為已發生、不再模擬；之後的才計入未來路徑。百分位數（P10~P90）代表模擬路徑的分布區間，不是預測值——例如 P10 代表「有 10% 的模拟路径結果比這更差」。</p>
+    <p><strong>免責聲明：</strong>本工具僅為個人資產成長試算輔助，四種年化報酬率、通膨率與蒙地卡羅模擬參數均為使用者自行假設之情境，不構成投資建議，實際報酬、波動與通膨可能因市場變化而與預估產生重大落差。</p>
   </section>
 
 </div>
@@ -394,6 +515,14 @@
     [2035,1,240000,'年終獎金'],[2036,1,240000,'年終獎金']
   ].map(function(r){ return {y:r[0], m:r[1], amt:r[2], note:r[3]}; });
 
+  (function addGracePeriodDca(){
+    var y = 2028, m = 8;
+    for (var i = 0; i < 60; i++) {
+      DEFAULT_CONTRIB.push({ y: y, m: m, amt: 16471, note: '寬限期結餘 DCA' });
+      m++; if (m > 12) { m = 1; y++; }
+    }
+  })();
+
   var now = new Date();
   var DEFAULTS = {
     shares: 1353.93752,
@@ -405,7 +534,24 @@
     inflationRate: 0.02,
     displayMode: 'nominal',
     currency: 'TWD',
-    contributions: DEFAULT_CONTRIB
+    contributions: DEFAULT_CONTRIB,
+    mc: {
+      currentValue: null,
+      anchorYear: now.getFullYear(),
+      anchorMonth: now.getMonth() + 1,
+      cagr: 0.07,
+      sigma: 0.17,
+      paths: 50000,
+      seg1Amount: 30000,
+      seg1Count: 26,
+      seg2Amount: 16471,
+      seg2Count: 60,
+      bonusEarlyAmount: 500000,
+      bonusLateAmount: 240000,
+      lumpSumAmount: 965340,
+      threshold36: 2000,
+      threshold43: 3500
+    }
   };
 
   var SERIES_META = [
@@ -422,6 +568,7 @@
       var s = JSON.parse(raw);
       var merged = JSON.parse(JSON.stringify(DEFAULTS));
       Object.keys(merged).forEach(function(k){ if (s[k] !== undefined) merged[k] = s[k]; });
+      if (s.mc) { Object.keys(merged.mc).forEach(function(k){ if (s.mc[k] !== undefined) merged.mc[k] = s.mc[k]; }); }
       return merged;
     } catch(e) { return JSON.parse(JSON.stringify(DEFAULTS)); }
   }
@@ -586,6 +733,7 @@
   }
 
   function renderContribTable() {
+    state.contributions.sort(function(a, b){ return (a.y * 12 + a.m) - (b.y * 12 + b.m); });
     var body = document.getElementById('contribBody');
     body.innerHTML = '';
     var anchorY = now.getFullYear(), anchorM = now.getMonth() + 1;
@@ -603,11 +751,11 @@
         inp.addEventListener('change', function(){
           var f = inp.getAttribute('data-f');
           state.contributions[idx][f] = (f === 'note') ? inp.value : Number(inp.value);
-          saveState(); recomputeAndRender();
+          saveState(); renderContribTable(); recomputeAndRender();
         });
       });
       tr.querySelector('[data-del]').addEventListener('click', function(){
-        state.contributions.splice(idx, 1); saveState(); recomputeAndRender();
+        state.contributions.splice(idx, 1); saveState(); renderContribTable(); recomputeAndRender();
       });
       body.appendChild(tr);
     });
@@ -625,7 +773,27 @@
       y = last.y; m = last.m + 1; if (m > 12) { m = 1; y++; }
     }
     state.contributions.push({y:y, m:m, amt:0, note:''});
-    saveState(); recomputeAndRender();
+    saveState(); renderContribTable(); recomputeAndRender();
+  });
+
+  document.getElementById('batchAddBtn').addEventListener('click', function(){
+    var s = document.getElementById('batchStart').value;
+    var e = document.getElementById('batchEnd').value;
+    var amt = Number(document.getElementById('batchAmt').value) || 0;
+    var note = document.getElementById('batchNote').value || '';
+    var msg = document.getElementById('batchMsg');
+    if (!s || !e || amt <= 0) { msg.textContent = '請填寫起訖年月與大於 0 的金額'; msg.style.color = 'var(--danger)'; return; }
+    var sp = s.split('-').map(Number), ep = e.split('-').map(Number);
+    if (sp[0]*12+sp[1] > ep[0]*12+ep[1]) { msg.textContent = '結束年月不能早於起始年月'; msg.style.color = 'var(--danger)'; return; }
+    var y = sp[0], m = sp[1], count = 0;
+    while ((y*12+m) <= (ep[0]*12+ep[1]) && count < 1200) {
+      state.contributions.push({ y: y, m: m, amt: amt, note: note });
+      m++; if (m > 12) { m = 1; y++; }
+      count++;
+    }
+    saveState(); renderContribTable(); recomputeAndRender();
+    msg.style.color = 'var(--good)';
+    msg.textContent = '已新增 ' + count + ' 筆（每筆 NT$ ' + amt.toLocaleString('zh-TW') + '）';
   });
 
   // ---------- Rendering: year table ----------
@@ -1034,10 +1202,349 @@
     renderChart();
   }
 
+  // ---------- Monte Carlo simulation ----------
+  var MC_BENCHMARK = {
+    p36_ge2000: 59.3, p43_ge3500: 51.3, p43_p10: 1592, p43_med: 3572
+  };
+
+  function mcAddRun(dca, amount, count, startY, startM) {
+    var y = startY, m = startM;
+    for (var i = 0; i < count; i++) {
+      var k = y + '-' + m;
+      dca[k] = (dca[k] || 0) + amount;
+      m++; if (m > 12) { m = 1; y++; }
+    }
+  }
+
+  // Four fixed-calendar contribution pieces (dates never change; only amounts/counts are user-editable):
+  //   1. 短期補給 DCA：seg1Amount/月，seg1Count 期，自 2026/06 起
+  //   2. 寬限期結餘 DCA：seg2Amount/月，seg2Count 期，自 2028/08 起
+  //   3. 年終獎金：2027–2028 每年 bonusEarlyAmount；2029–2036 每年 bonusLateAmount
+  //   4. 回台前單筆匯回：lumpSumAmount，固定 2028/08 一次性
+  function mcBuildSchedule(p) {
+    var dca = {};
+    mcAddRun(dca, p.seg1Amount, p.seg1Count, 2026, 6);
+    mcAddRun(dca, p.seg2Amount, p.seg2Count, 2028, 8);
+    dca['2028-8'] = (dca['2028-8'] || 0) + p.lumpSumAmount;
+    var bonus = {};
+    bonus['2027-1'] = (bonus['2027-1'] || 0) + p.bonusEarlyAmount;
+    bonus['2028-1'] = (bonus['2028-1'] || 0) + p.bonusEarlyAmount;
+    for (var by = 2029; by <= 2036; by++) {
+      var bk = by + '-1';
+      bonus[bk] = (bonus[bk] || 0) + p.bonusLateAmount;
+    }
+    return { dca: dca, bonus: bonus };
+  }
+
+  function mcContribAt(sched, y, m) {
+    var k = y + '-' + m;
+    return (sched.dca[k] || 0) + (sched.bonus[k] || 0);
+  }
+
+  var _mcSpare = null;
+  function mcRandNormal() {
+    if (_mcSpare !== null) { var s = _mcSpare; _mcSpare = null; return s; }
+    var u1 = Math.random(), u2 = Math.random();
+    if (u1 < 1e-12) u1 = 1e-12;
+    var mag = Math.sqrt(-2 * Math.log(u1));
+    _mcSpare = mag * Math.sin(2 * Math.PI * u2);
+    return mag * Math.cos(2 * Math.PI * u2);
+  }
+
+  // Simulate N paths from (anchorYear, anchorMonth) forward to (targetY, targetM) inclusive.
+  // Returns a Float64Array of path values at the target month, or null if target is before/at anchor.
+  function mcSimulateToDate(p, targetY, targetM, sched) {
+    var totalMonths = (targetY - p.anchorYear) * 12 + (targetM - p.anchorMonth);
+    if (totalMonths < 0) return null;
+    var muLogM = Math.log(1 + p.cagr) / 12;
+    var sigmaLogM = p.sigma / Math.sqrt(12);
+    var N = p.paths;
+    var V = new Float64Array(N).fill(p.currentValue);
+    var y = p.anchorYear, m = p.anchorMonth;
+    for (var idx = 0; idx <= totalMonths; idx++) {
+      if (idx > 0) {
+        var c = mcContribAt(sched, y, m);
+        if (sigmaLogM > 0) {
+          for (var i = 0; i < N; i++) {
+            V[i] = V[i] * Math.exp(muLogM + sigmaLogM * mcRandNormal()) + c;
+          }
+        } else {
+          var growth = Math.exp(muLogM);
+          for (var j = 0; j < N; j++) { V[j] = V[j] * growth + c; }
+        }
+      }
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return V;
+  }
+
+  function mcSimulate(p) {
+    var sched = mcBuildSchedule(p);
+    return {
+      snap36: mcSimulateToDate(p, 2036, p.anchorMonth, sched),
+      snap43: mcSimulateToDate(p, 2043, p.anchorMonth, sched)
+    };
+  }
+
+  function mcClosedForm(p) {
+    var monthlyFactor = Math.pow(1 + p.cagr, 1 / 12);
+    var sched = mcBuildSchedule(p);
+    function valueAt(targetY, targetM) {
+      var totalMonths = (targetY - p.anchorYear) * 12 + (targetM - p.anchorMonth);
+      if (totalMonths < 0) return null;
+      var V = p.currentValue;
+      var y = p.anchorYear, m = p.anchorMonth;
+      for (var idx = 0; idx <= totalMonths; idx++) {
+        if (idx > 0) { V = V * monthlyFactor + mcContribAt(sched, y, m); }
+        m++; if (m > 12) { m = 1; y++; }
+      }
+      return V;
+    }
+    return { val36: valueAt(2036, p.anchorMonth), val43: valueAt(2043, p.anchorMonth) };
+  }
+
+  function mcPercentile(arr, pct) {
+    var sorted = Array.prototype.slice.call(arr).sort(function(a, b){ return a - b; });
+    var idx = (pct / 100) * (sorted.length - 1);
+    var lo = Math.floor(idx), hi = Math.ceil(idx);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  }
+
+  function mcStats(arr, thresholdTWD) {
+    var above = 0;
+    for (var i = 0; i < arr.length; i++) { if (arr[i] >= thresholdTWD) above++; }
+    return {
+      p10: mcPercentile(arr, 10), p25: mcPercentile(arr, 25),
+      median: mcPercentile(arr, 50), p75: mcPercentile(arr, 75), p90: mcPercentile(arr, 90),
+      probAbove: above / arr.length
+    };
+  }
+
+  function mcReadParams() {
+    var dateStr = document.getElementById('mcAnchorDate').value;
+    var parts = dateStr ? dateStr.split('-').map(Number) : [state.mc.anchorYear, state.mc.anchorMonth];
+    return {
+      currentValue: Number(document.getElementById('mcCurrentValue').value) || 0,
+      anchorYear: parts[0], anchorMonth: parts[1],
+      cagr: (Number(document.getElementById('mcCagr').value) || 0) / 100,
+      sigma: (Number(document.getElementById('mcSigma').value) || 0) / 100,
+      paths: Math.max(1000, Math.min(200000, Number(document.getElementById('mcPaths').value) || 50000)),
+      seg1Amount: Number(document.getElementById('mcSeg1Amount').value) || 0,
+      seg1Count: Math.max(0, Math.round(Number(document.getElementById('mcSeg1Count').value) || 0)),
+      seg2Amount: Number(document.getElementById('mcSeg2Amount').value) || 0,
+      seg2Count: Math.max(0, Math.round(Number(document.getElementById('mcSeg2Count').value) || 0)),
+      bonusEarlyAmount: Number(document.getElementById('mcBonusEarlyAmount').value) || 0,
+      bonusLateAmount: Number(document.getElementById('mcBonusLateAmount').value) || 0,
+      lumpSumAmount: Number(document.getElementById('mcLumpSumAmount').value) || 0,
+      threshold36: Number(document.getElementById('mcThreshold36').value) || 0,
+      threshold43: Number(document.getElementById('mcThreshold43').value) || 0
+    };
+  }
+
+  function mcSaveParams(p) {
+    state.mc.currentValue = p.currentValue;
+    state.mc.anchorYear = p.anchorYear; state.mc.anchorMonth = p.anchorMonth;
+    state.mc.cagr = p.cagr; state.mc.sigma = p.sigma; state.mc.paths = p.paths;
+    state.mc.seg1Amount = p.seg1Amount; state.mc.seg1Count = p.seg1Count;
+    state.mc.seg2Amount = p.seg2Amount; state.mc.seg2Count = p.seg2Count;
+    state.mc.bonusEarlyAmount = p.bonusEarlyAmount; state.mc.bonusLateAmount = p.bonusLateAmount;
+    state.mc.lumpSumAmount = p.lumpSumAmount;
+    state.mc.threshold36 = p.threshold36; state.mc.threshold43 = p.threshold43;
+    saveState();
+  }
+
+  function mcApplyParamsToInputs(p) {
+    document.getElementById('mcCurrentValue').value = p.currentValue;
+    document.getElementById('mcAnchorDate').value = p.anchorYear + '-' + String(p.anchorMonth).padStart(2, '0');
+    document.getElementById('mcCagr').value = round2(p.cagr * 100);
+    document.getElementById('mcSigma').value = round2(p.sigma * 100);
+    document.getElementById('mcPaths').value = p.paths;
+    document.getElementById('mcSeg1Amount').value = p.seg1Amount;
+    document.getElementById('mcSeg1Count').value = p.seg1Count;
+    document.getElementById('mcSeg2Amount').value = p.seg2Amount;
+    document.getElementById('mcSeg2Count').value = p.seg2Count;
+    document.getElementById('mcBonusEarlyAmount').value = p.bonusEarlyAmount;
+    document.getElementById('mcBonusLateAmount').value = p.bonusLateAmount;
+    document.getElementById('mcLumpSumAmount').value = p.lumpSumAmount;
+    document.getElementById('mcThreshold36').value = p.threshold36;
+    document.getElementById('mcThreshold43').value = p.threshold43;
+  }
+
+  function mcFmtWan(twd) { return Math.round(twd / 10000).toLocaleString('zh-TW'); }
+
+  function mcRenderDistRow(yearLabel, stats, thresholdWan, scaleMax) {
+    var W = 900, H = 78, padL = 8, padR = 8, y0 = 40;
+    var plotW = W - padL - padR;
+    function x(v) { return padL + Math.max(0, Math.min(1, v / scaleMax)) * plotW; }
+    var thresholdTWD = thresholdWan * 10000;
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:' + H + 'px;display:block;overflow:visible;">' +
+      '<line x1="' + x(0) + '" y1="' + y0 + '" x2="' + x(scaleMax) + '" y2="' + y0 + '" stroke="var(--grid)" stroke-width="8" stroke-linecap="round"/>' +
+      '<line x1="' + x(stats.p10) + '" y1="' + y0 + '" x2="' + x(stats.p25) + '" y2="' + y0 + '" stroke="var(--accent)" stroke-width="2" opacity="0.55"/>' +
+      '<line x1="' + x(stats.p75) + '" y1="' + y0 + '" x2="' + x(stats.p90) + '" y2="' + y0 + '" stroke="var(--accent)" stroke-width="2" opacity="0.55"/>' +
+      '<line x1="' + x(stats.p25) + '" y1="' + y0 + '" x2="' + x(stats.p75) + '" y2="' + y0 + '" stroke="var(--accent)" stroke-width="12" stroke-linecap="round" opacity="0.32"/>' +
+      '<line x1="' + x(stats.median) + '" y1="' + (y0 - 11) + '" x2="' + x(stats.median) + '" y2="' + (y0 + 11) + '" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>' +
+      '<line x1="' + x(thresholdTWD) + '" y1="' + (y0 - 18) + '" x2="' + x(thresholdTWD) + '" y2="' + (y0 + 18) + '" stroke="var(--danger)" stroke-width="2" stroke-dasharray="3,3"/>' +
+      '<text x="' + x(thresholdTWD) + '" y="' + (y0 - 22) + '" text-anchor="middle" font-size="11" fill="var(--danger)">門檻 ' + thresholdWan.toLocaleString('zh-TW') + ' 萬</text>' +
+      '</svg>';
+    return '<div class="mc-year-block">' +
+      '<div class="mc-year-head"><span class="yr">' + yearLabel + '</span>' +
+      '<span><span class="prob">' + (stats.probAbove * 100).toFixed(1) + '%</span> <span class="prob-label">的模擬路徑達到門檻以上</span></span></div>' +
+      svg +
+      '<div class="mc-stats-row">' +
+      '<span>P10：<b>' + mcFmtWan(stats.p10) + '</b> 萬</span>' +
+      '<span>P25：<b>' + mcFmtWan(stats.p25) + '</b> 萬</span>' +
+      '<span>中位數：<b>' + mcFmtWan(stats.median) + '</b> 萬</span>' +
+      '<span>P75：<b>' + mcFmtWan(stats.p75) + '</b> 萬</span>' +
+      '<span>P90：<b>' + mcFmtWan(stats.p90) + '</b> 萬</span>' +
+      '</div></div>';
+  }
+
+  function mcRunSimulationCore(p, onDone) {
+    var errBox = document.getElementById('mcResults');
+    if (p.currentValue <= 0) { errBox.innerHTML = '<p class="mc-note" style="color:var(--danger);">請輸入大於 0 的「目前 VT 市值」。</p>'; return; }
+    if (p.anchorYear > 2043) { errBox.innerHTML = '<p class="mc-note" style="color:var(--danger);">「目前日期」已超過模擬終點 2043 年，請調整日期。</p>'; return; }
+    document.getElementById('mcRunMeta').textContent = '計算中…';
+    setTimeout(function(){
+      var t0 = performance.now();
+      var res = mcSimulate(p);
+      var t1 = performance.now();
+      if (!res.snap36 && !res.snap43) {
+        errBox.innerHTML = '<p class="mc-note" style="color:var(--danger);">目前日期已晚於 2036 年與 2043 年的對應月份，無法產生快照，請調整目前日期。</p>';
+        document.getElementById('mcRunMeta').textContent = '';
+        return;
+      }
+      var stats36 = res.snap36 ? mcStats(res.snap36, p.threshold36 * 10000) : null;
+      var stats43 = res.snap43 ? mcStats(res.snap43, p.threshold43 * 10000) : null;
+      var scaleMax = Math.max(
+        stats36 ? stats36.p90 : 0, stats43 ? stats43.p90 : 0,
+        p.threshold36 * 10000, p.threshold43 * 10000
+      ) * 1.08;
+      var html = '';
+      if (stats36) html += mcRenderDistRow('2036 年（' + p.anchorMonth + ' 月）', stats36, p.threshold36, scaleMax);
+      else html += '<p class="mc-note">目前日期已晚於 2036 年 ' + p.anchorMonth + ' 月，略過 2036 年快照。</p>';
+      if (stats43) html += mcRenderDistRow('2043 年（' + p.anchorMonth + ' 月）', stats43, p.threshold43, scaleMax);
+      else html += '<p class="mc-note">目前日期已晚於 2043 年 ' + p.anchorMonth + ' 月，略過 2043 年快照。</p>';
+      html += '<div class="mc-legend">━━ 粗線：25–75 百分位區間（一半模擬路徑落在此範圍）　│ 細線：10–90 百分位　┃ 短粗直線：中位數　┊ 紅色虛線：您設定的門檻</div>';
+      errBox.innerHTML = html;
+      document.getElementById('mcRunMeta').textContent = p.paths.toLocaleString('zh-TW') + ' 條路徑，耗時 ' + Math.round(t1 - t0) + ' ms';
+      if (onDone) onDone(stats36, stats43);
+    }, 20);
+  }
+
+  function mcRunSimulation() {
+    var p = mcReadParams();
+    mcSaveParams(p);
+    mcRunSimulationCore(p);
+  }
+
+  function mcRunSelfCheck() {
+    var p = mcReadParams();
+    if (p.currentValue <= 0 || p.anchorYear > 2043) { document.getElementById('mcSelfCheck').textContent = '請先輸入有效的目前市值與日期。'; return; }
+    var closed = mcClosedForm(p);
+    var zeroSigmaP = Object.assign({}, p, { sigma: 0, paths: 8 });
+    var mc0 = mcSimulate(zeroSigmaP);
+    if (!closed.val36 || !mc0.snap36) { document.getElementById('mcSelfCheck').textContent = '目前日期晚於檢查年份，無法檢查。'; return; }
+    var mc36 = mc0.snap36[0], mc43 = mc0.snap43[0];
+    var d36 = closed.val36 ? Math.abs(mc36 - closed.val36) / closed.val36 * 100 : 0;
+    var d43 = closed.val43 ? Math.abs(mc43 - closed.val43) / closed.val43 * 100 : 0;
+    document.getElementById('mcSelfCheck').innerHTML =
+      '此檢查固定把波動度設為 0%（不受上方波動度欄位影響），比對「模擬引擎」與「獨立寫的純複利公式」是否算出同一個數字：<br>' +
+      '2036：模擬 = NT$ ' + Math.round(mc36).toLocaleString('zh-TW') + '　純複利公式 = NT$ ' + Math.round(closed.val36).toLocaleString('zh-TW') + '　差異 ' + d36.toFixed(4) + '%<br>' +
+      '2043：模擬 = NT$ ' + Math.round(mc43).toLocaleString('zh-TW') + '　純複利公式 = NT$ ' + Math.round(closed.val43).toLocaleString('zh-TW') + '　差異 ' + d43.toFixed(4) + '%<br>' +
+      '<span style="color:' + ((d36 < 0.01 && d43 < 0.01) ? 'var(--good)' : 'var(--danger)') + ';">' + ((d36 < 0.01 && d43 < 0.01) ? '✓ 誤差在 0.01% 以內，邏輯一致。' : '✗ 誤差超過 0.01%，計算邏輯可能有誤，請回報。') + '</span>';
+  }
+
+  function mcRunTestScenario() {
+    var testParams = {
+      currentValue: 10500000, anchorYear: 2028, anchorMonth: 8,
+      cagr: 0.07, sigma: 0.17, paths: 50000,
+      seg1Amount: 30000, seg1Count: 26, seg2Amount: 16471, seg2Count: 60,
+      bonusEarlyAmount: 500000, bonusLateAmount: 240000, lumpSumAmount: 965340,
+      threshold36: 2000, threshold43: 3500
+    };
+    mcApplyParamsToInputs(testParams);
+    mcSaveParams(testParams);
+    document.getElementById('mcTestResults').innerHTML = '<p class="mc-note">計算中…</p>';
+    mcRunSimulationCore(testParams, function(stats36, stats43){
+      var rows = [
+        ['2036 年 ≥ 2000 萬機率', (stats36.probAbove*100).toFixed(1) + '%', MC_BENCHMARK.p36_ge2000.toFixed(1) + '%', ((stats36.probAbove*100) - MC_BENCHMARK.p36_ge2000).toFixed(1) + ' pp'],
+        ['2043 年 ≥ 3500 萬機率', (stats43.probAbove*100).toFixed(1) + '%', MC_BENCHMARK.p43_ge3500.toFixed(1) + '%', ((stats43.probAbove*100) - MC_BENCHMARK.p43_ge3500).toFixed(1) + ' pp'],
+        ['2043 年 P10', mcFmtWan(stats43.p10) + ' 萬', MC_BENCHMARK.p43_p10.toLocaleString('zh-TW') + ' 萬', (Math.round(stats43.p10/10000) - MC_BENCHMARK.p43_p10).toLocaleString('zh-TW') + ' 萬'],
+        ['2043 年中位數', mcFmtWan(stats43.median) + ' 萬', MC_BENCHMARK.p43_med.toLocaleString('zh-TW') + ' 萬', (Math.round(stats43.median/10000) - MC_BENCHMARK.p43_med).toLocaleString('zh-TW') + ' 萬']
+      ];
+      var html = '<table class="mc-test-table"><thead><tr><th>指標</th><th>本次模擬</th><th>你的驗證基準</th><th>差異</th></tr></thead><tbody>' +
+        rows.map(function(r){ return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td><td>' + r[3] + '</td></tr>'; }).join('') +
+        '</tbody></table>' +
+        '<p class="mc-note">蒙地卡羅模擬本身帶有隨機性，每次執行、以及跟您原本的驗證基準相比，通常會有 1 個百分點以內（金額則約 1~2%）的正常波動，這不代表邏輯有誤；若差異持續明顯偏大（例如機率差超過 3 個百分點），才需要檢查投入排程或校準公式。</p>';
+      document.getElementById('mcTestResults').innerHTML = html;
+    });
+    mcRunSelfCheck();
+  }
+
+  // Independent check: does segment 1 (短期補給 DCA) correctly hand off into segment 2 (寬限期結餘 DCA)?
+  // Anchor 2026/08 with 694.9萬, simulate to 2028/08 — this window straddles both segments and
+  // the 2027/2028 年終獎金加碼, so any missing/misaligned segment shows up as an obviously wrong number.
+  function mcRunSegmentCheck() {
+    var box = document.getElementById('mcSegCheckResults');
+    var p = {
+      currentValue: 6949000, anchorYear: 2026, anchorMonth: 8,
+      cagr: 0.07, sigma: 0.17, paths: 50000,
+      seg1Amount: 30000, seg1Count: 26, seg2Amount: 16471, seg2Count: 60,
+      bonusEarlyAmount: 500000, bonusLateAmount: 240000, lumpSumAmount: 965340
+    };
+    box.innerHTML = '<p class="mc-note">計算中…</p>';
+    setTimeout(function(){
+      var sched = mcBuildSchedule(p);
+      var v = mcSimulateToDate(p, 2028, 8, sched);
+      var median = mcPercentile(v, 50);
+      var p10 = mcPercentile(v, 10), p90 = mcPercentile(v, 90);
+      var loWan = 1000, hiWan = 1100;
+      var medianWan = median / 10000;
+      var inRange = medianWan >= loWan && medianWan <= hiWan;
+      box.innerHTML =
+        '<p class="mc-note"><b style="color:var(--text-primary);">三段式銜接驗證</b>（2026 年 8 月，694.9 萬 → 模擬到 2028 年 8 月，跨過①②兩段 DCA 交接點、2027/2028 年終獎金加碼，以及 2028/08 單筆匯回）：<br>' +
+        '模擬中位數 = ' + mcFmtWan(median) + ' 萬（P10 ' + mcFmtWan(p10) + ' 萬 ～ P90 ' + mcFmtWan(p90) + ' 萬）<br>' +
+        '<span style="color:' + (inRange ? 'var(--good)' : 'var(--danger)') + ';">' +
+        (inRange ? '✓ 落在你預期的 1000–1100 萬區間內。' : '⚠ 未落在 1000–1100 萬區間內，跟預期差距約 ' + Math.round(medianWan - (medianWan < loWan ? loWan : hiWan)).toLocaleString('zh-TW') + ' 萬。') +
+        '</span></p>';
+    }, 20);
+  }
+
+  function initMcInputs() {
+    if (!state.mc.currentValue) {
+      var proj0 = computeProjection();
+      state.mc.currentValue = Math.round(proj0.currentValue) || 0;
+    }
+    mcApplyParamsToInputs({
+      currentValue: state.mc.currentValue, anchorYear: state.mc.anchorYear, anchorMonth: state.mc.anchorMonth,
+      cagr: state.mc.cagr, sigma: state.mc.sigma, paths: state.mc.paths,
+      seg1Amount: state.mc.seg1Amount, seg1Count: state.mc.seg1Count,
+      seg2Amount: state.mc.seg2Amount, seg2Count: state.mc.seg2Count,
+      bonusEarlyAmount: state.mc.bonusEarlyAmount, bonusLateAmount: state.mc.bonusLateAmount,
+      lumpSumAmount: state.mc.lumpSumAmount,
+      threshold36: state.mc.threshold36, threshold43: state.mc.threshold43
+    });
+    ['mcCurrentValue','mcAnchorDate','mcCagr','mcSigma','mcPaths','mcSeg1Amount','mcSeg1Count','mcSeg2Amount','mcSeg2Count','mcBonusEarlyAmount','mcBonusLateAmount','mcLumpSumAmount','mcThreshold36','mcThreshold43'].forEach(function(id){
+      document.getElementById(id).addEventListener('change', function(){ mcSaveParams(mcReadParams()); });
+    });
+    document.getElementById('mcRunBtn').addEventListener('click', mcRunSimulation);
+    document.getElementById('mcTestBtn').addEventListener('click', mcRunTestScenario);
+    document.getElementById('mcSegCheckBtn').addEventListener('click', mcRunSegmentCheck);
+    document.getElementById('mcSyncValueBtn').addEventListener('click', function(){
+      if (!lastProj) return;
+      document.getElementById('mcCurrentValue').value = Math.round(lastProj.currentValue);
+      document.getElementById('mcAnchorDate').value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      mcSaveParams(mcReadParams());
+    });
+    document.getElementById('mcSelfCheckDetails').addEventListener('toggle', function(){ if (this.open) mcRunSelfCheck(); });
+  }
+
   // ---------- Init ----------
   initInputs();
   renderContribTable();
   recomputeAndRender();
+  initMcInputs();
 
   // apply cached live values immediately (before network), then try to refresh
   (function applyCacheThenFetch(){
