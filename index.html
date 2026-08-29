@@ -4,14 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VT 退休資產成長預估工具</title>
-<!-- PWA / iOS 加入主畫面 支援 -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="VT估算">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#f9f9f7">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-180.png">
 <style>
   :root {
     color-scheme: light;
@@ -440,6 +432,7 @@
         <div class="field">
           <label>① 期數（固定自 2026/06 起算）</label>
           <input type="number" id="mcSeg1Count" step="1">
+          <div class="hint" id="mcSeg1Progress" style="font-size:11px; color:var(--text-secondary); margin-top:4px;"></div>
         </div>
         <div class="field">
           <label>② 寬限期結餘 DCA 每月金額（元）</label>
@@ -448,6 +441,7 @@
         <div class="field">
           <label>② 期數（固定自 2028/08 起算）</label>
           <input type="number" id="mcSeg2Count" step="1">
+          <div class="hint" id="mcSeg2Progress" style="font-size:11px; color:var(--text-secondary); margin-top:4px;"></div>
         </div>
         <div class="field">
           <label>③ 年終獎金加碼（2027、2028 各一次）</label>
@@ -1241,6 +1235,27 @@
     return (sched.dca[k] || 0) + (sched.bonus[k] || 0);
   }
 
+  function mcFmtProgress(anchorYear, anchorMonth, startY, startM, count) {
+    // 模擬邏輯視「目前市值」已含目前日期當月的投入（見 mcSimulateToDate：
+    // 只從 anchor 的下一個月才開始加投入），所以當月本身也算「已過」。
+    var startLabel = startY + '/' + String(startM).padStart(2, '0');
+    var elapsed = (anchorYear - startY) * 12 + (anchorMonth - startM) + 1;
+    if (elapsed <= 0) return '尚未開始（起算日 ' + startLabel + '）';
+    if (elapsed >= count) return '已跑完（共 ' + count + ' 期）';
+    return '已過 ' + elapsed + ' 期，尚餘 ' + (count - elapsed) + ' 期';
+  }
+
+  function mcUpdateProgressLabels() {
+    var dateStr = document.getElementById('mcAnchorDate').value;
+    if (!dateStr) return;
+    var parts = dateStr.split('-').map(Number);
+    var anchorYear = parts[0], anchorMonth = parts[1];
+    var seg1Count = Math.max(0, Math.round(Number(document.getElementById('mcSeg1Count').value) || 0));
+    var seg2Count = Math.max(0, Math.round(Number(document.getElementById('mcSeg2Count').value) || 0));
+    document.getElementById('mcSeg1Progress').textContent = mcFmtProgress(anchorYear, anchorMonth, 2026, 6, seg1Count);
+    document.getElementById('mcSeg2Progress').textContent = mcFmtProgress(anchorYear, anchorMonth, 2028, 8, seg2Count);
+  }
+
   var _mcSpare = null;
   function mcRandNormal() {
     if (_mcSpare !== null) { var s = _mcSpare; _mcSpare = null; return s; }
@@ -1528,6 +1543,10 @@
     ['mcCurrentValue','mcAnchorDate','mcCagr','mcSigma','mcPaths','mcSeg1Amount','mcSeg1Count','mcSeg2Amount','mcSeg2Count','mcBonusEarlyAmount','mcBonusLateAmount','mcLumpSumAmount','mcThreshold36','mcThreshold43'].forEach(function(id){
       document.getElementById(id).addEventListener('change', function(){ mcSaveParams(mcReadParams()); });
     });
+    ['mcAnchorDate','mcSeg1Count','mcSeg2Count'].forEach(function(id){
+      document.getElementById(id).addEventListener('change', mcUpdateProgressLabels);
+      document.getElementById(id).addEventListener('input', mcUpdateProgressLabels);
+    });
     document.getElementById('mcRunBtn').addEventListener('click', mcRunSimulation);
     document.getElementById('mcTestBtn').addEventListener('click', mcRunTestScenario);
     document.getElementById('mcSegCheckBtn').addEventListener('click', mcRunSegmentCheck);
@@ -1536,8 +1555,10 @@
       document.getElementById('mcCurrentValue').value = Math.round(lastProj.currentValue);
       document.getElementById('mcAnchorDate').value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
       mcSaveParams(mcReadParams());
+      mcUpdateProgressLabels();
     });
     document.getElementById('mcSelfCheckDetails').addEventListener('toggle', function(){ if (this.open) mcRunSelfCheck(); });
+    mcUpdateProgressLabels();
   }
 
   // ---------- Init ----------
