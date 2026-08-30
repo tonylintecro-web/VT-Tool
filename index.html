@@ -2,8 +2,20 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>VT 退休資產成長預估工具</title>
+
+<!-- ===== PWA / 加到主畫面支援 — 修改本檔案時請勿移除以下這段（見專案 CLAUDE.md） ===== -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d0d0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VT資產預估">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%88%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230d0d0d'/%3E%3Ctext x='50' y='68' font-size='58' text-anchor='middle'%3E%F0%9F%93%88%3C/text%3E%3C/svg%3E">
+<!-- ===== /PWA ===== -->
+
 <style>
   :root {
     color-scheme: light;
@@ -383,6 +395,36 @@
   </section>
 
   <section class="card">
+    <h2>🎯 目標倒推</h2>
+    <p class="hint" style="display:block; margin:-8px 0 14px; color:var(--muted); font-size:12px; line-height:1.6;">
+      在「情境與預估參數」的四種報酬率、以及「投入排程」都維持不變的前提下，回推要達成目標，每月還需要額外多存多少（沿用上方名目金額計算）。
+    </p>
+    <div class="settings-grid">
+      <div class="field">
+        <label>目標年份</label>
+        <input type="number" id="gsTargetYear" step="1">
+      </div>
+      <div class="field">
+        <label>目標月份</label>
+        <select id="gsTargetMonth">
+          <option value="1">1 月</option><option value="2">2 月</option><option value="3">3 月</option>
+          <option value="4">4 月</option><option value="5">5 月</option><option value="6">6 月</option>
+          <option value="7">7 月</option><option value="8">8 月</option><option value="9">9 月</option>
+          <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>目標金額（萬元台幣）</label>
+        <input type="number" id="gsTargetAmount" step="10">
+      </div>
+    </div>
+    <div class="contrib-foot" style="margin-top:12px;">
+      <button id="gsRunBtn" class="primary">計算還需多存多少</button>
+    </div>
+    <div id="gsResults"></div>
+  </section>
+
+  <section class="card">
     <h2>🎲 蒙地卡羅資產機率模擬</h2>
     <p class="hint" style="display:block; margin:-8px 0 14px; color:var(--muted); font-size:12px; line-height:1.6;">
       用大量隨機路徑模擬報酬率的年度波動（而不是只看單一固定成長率），估算 2036 年與 2043 年資產落在各種區間的機率分佈。這個模組使用獨立的假設與投入排程，跟上方「情境與預估參數」「投入排程」是分開的兩套設定。
@@ -423,7 +465,7 @@
     </div>
 
     <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
-      <div class="label" style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">投入排程（本模組固定假設的三段交錯金流，日曆時間點不會變動，只有金額/期數可調）</div>
+      <div class="label" style="font-size:12px; color:var(--text-secondary); margin-bottom:8px;">投入排程（本模組固定假設的四段交錯金流，日曆時間點不會變動，只有金額/期數可調）</div>
       <div class="settings-grid">
         <div class="field">
           <label>① 短期補給 DCA 每月金額（元）</label>
@@ -708,6 +750,25 @@
       }
     });
     return { currentValue: currentValue, anchorY: anchorY, anchorM: anchorM, rows: rows };
+  }
+
+  // Nominal value under each of the 4 scenarios at an arbitrary (targetY, targetM), using the
+  // same current value + 投入排程 + rates as computeProjection. Returns null if target is before now.
+  function computeValueAtDate(targetY, targetM) {
+    var anchorY = now.getFullYear(), anchorM = now.getMonth() + 1;
+    var currentValue = (Number(state.shares)||0) * (Number(state.vtPrice)||0) * (Number(state.fxRate)||0);
+    var totalMonths = (targetY - anchorY) * 12 + (targetM - anchorM);
+    if (totalMonths < 0) return null;
+    var assets = state.rates.map(function(){ return currentValue; });
+    var y = anchorY, m = anchorM;
+    for (var idx = 0; idx <= totalMonths; idx++) {
+      if (idx > 0) {
+        var contrib = contributionFor(state.contributions, y, m);
+        assets = assets.map(function(a, i){ return a * (1 + state.rates[i]/12) + contrib; });
+      }
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return { values: assets, monthsElapsed: totalMonths, anchorY: anchorY, anchorM: anchorM };
   }
 
   // ---------- Rendering: status ----------
@@ -1196,6 +1257,51 @@
     renderChart();
   }
 
+  // ---------- Goal-seek: how much extra monthly saving is needed to hit a target? ----------
+  function gsRun() {
+    var box = document.getElementById('gsResults');
+    var targetY = Math.round(Number(document.getElementById('gsTargetYear').value) || 0);
+    var targetM = Math.round(Number(document.getElementById('gsTargetMonth').value) || 0);
+    var targetTWD = (Number(document.getElementById('gsTargetAmount').value) || 0) * 10000;
+    if (targetTWD <= 0) { box.innerHTML = '<p class="mc-note" style="color:var(--danger);">請輸入大於 0 的目標金額。</p>'; return; }
+    var res = computeValueAtDate(targetY, targetM);
+    if (!res) { box.innerHTML = '<p class="mc-note" style="color:var(--danger);">目標年月不能早於現在（' + now.getFullYear() + ' 年 ' + (now.getMonth()+1) + ' 月）。</p>'; return; }
+    var n = res.monthsElapsed;
+    var rows = SERIES_META.map(function(s, i){
+      var projected = res.values[i];
+      var gap = targetTWD - projected;
+      var r = state.rates[i] / 12;
+      var extra = null, note = '';
+      if (gap <= 0) {
+        note = '✓ 照現有計畫已達標，還多出 ' + mcFmtWan(-gap) + ' 萬';
+      } else if (n === 0) {
+        note = '目標月份就是這個月，來不及用「每月存」補上，缺口是 ' + mcFmtWan(gap) + ' 萬（只能一次補進）';
+      } else {
+        extra = (r === 0) ? (gap / n) : (gap * r / (Math.pow(1 + r, n) - 1));
+        note = 'NT$ ' + Math.round(extra).toLocaleString('zh-TW') + ' /月';
+      }
+      return { label: s.label, varname: s.varname, rate: state.rates[i], projected: projected, gap: gap, note: note, achieved: gap <= 0 };
+    });
+    var html = '<table class="mc-test-table"><thead><tr><th>情境</th><th>年化報酬率</th><th>照現有計畫預估值</th><th>目標</th><th>還需每月多存</th></tr></thead><tbody>' +
+      rows.map(function(r){
+        return '<tr><td><span class="swatch" style="background:var(' + r.varname + ')"></span>' + r.label + '</td>' +
+          '<td>' + (Math.round(r.rate*1000)/10) + '%</td>' +
+          '<td>' + mcFmtWan(r.projected) + ' 萬</td>' +
+          '<td>' + mcFmtWan(targetTWD) + ' 萬</td>' +
+          '<td style="color:' + (r.achieved ? 'var(--good)' : 'var(--text-primary)') + ';">' + r.note + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<p class="mc-note">共 ' + n + ' 個月後到達目標月份，換算方式：假設每月固定多存一筆錢、跟現有資產一樣按該情境報酬率複利滾動，回推所需金額（用年金終值公式，跟蒙地卡羅模擬用的隨機路徑無關，是單一固定情境的推算）。</p>';
+    box.innerHTML = html;
+  }
+
+  function initGoalSeek() {
+    var d = new Date();
+    document.getElementById('gsTargetYear').value = d.getFullYear() + 10;
+    document.getElementById('gsTargetMonth').value = d.getMonth() + 1;
+    document.getElementById('gsTargetAmount').value = 3000;
+    document.getElementById('gsRunBtn').addEventListener('click', gsRun);
+  }
+
   // ---------- Monte Carlo simulation ----------
   var MC_BENCHMARK = {
     p36_ge2000: 59.3, p43_ge3500: 51.3, p43_p10: 1592, p43_med: 3572
@@ -1565,6 +1671,7 @@
   initInputs();
   renderContribTable();
   recomputeAndRender();
+  initGoalSeek();
   initMcInputs();
 
   // apply cached live values immediately (before network), then try to refresh
